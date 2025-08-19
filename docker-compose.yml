@@ -1,0 +1,53 @@
+version: '3.8'
+
+services:
+  redis:
+    image: redis:7-alpine
+    container_name: cache_redis
+    ports:
+      - "6379:6379"
+    command: redis-server --appendonly yes
+    volumes:
+      - redis_data:/data
+    networks:
+      - cache_network
+
+  postgres:
+    image: postgres:15-alpine
+    container_name: cache_postgres
+    environment:
+      POSTGRES_DB: cachedb
+      POSTGRES_USER: cacheuser
+      POSTGRES_PASSWORD: cachepass
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./init.sql:/docker-entrypoint-initdb.d/init.sql
+    networks:
+      - cache_network
+
+  app:
+    build: .
+    container_name: cache_app
+    ports:
+      - "3000:3000"
+    depends_on:
+      - redis
+      - postgres
+    environment:
+      - REDIS_URL=redis://redis:6379
+      - DATABASE_URL=postgresql://cacheuser:cachepass@postgres:5432/cachedb
+    networks:
+      - cache_network
+    volumes:
+      - .:/app
+      - /app/node_modules
+
+volumes:
+  redis_data:
+  postgres_data:
+
+networks:
+  cache_network:
+    driver: bridge
